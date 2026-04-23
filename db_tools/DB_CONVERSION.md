@@ -25,7 +25,7 @@ You can choose a different output filename when running the converter (e.g. anot
 From the repository root:
 
 ```bash
-python3 db_tools/mysql_dump_to_postgres.py preprod_EB_080426.sql postgres_EB.sql
+python3 db_tools/mysql_dump_to_postgres.py db_tools/preprod_EB_230426.sql db_tools/postgres_EB.sql
 ```
 
 For another MySQL/MariaDB dump:

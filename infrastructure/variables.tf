@@ -14,3 +14,9 @@ variable "project_name" {
 
   default = "terraform-eb"
 }
+
+variable "db_master_password" {
+  type        = string
+  description = "Master password for Aurora PostgreSQL database."
+  sensitive   = true
+}

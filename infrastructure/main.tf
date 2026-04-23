@@ -43,3 +43,10 @@ module "hello" {
 
   secret_key = "secret"
 }
+
+module "aws-aurora" {
+  source = "./modules/aws-aurora"
+
+  project_name       = var.project_name
+  db_master_password = var.db_master_password
+}
