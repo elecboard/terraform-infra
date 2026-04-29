@@ -50,3 +50,10 @@ module "aws-aurora" {
   project_name       = var.project_name
   db_master_password = var.db_master_password
 }
+
+module "aws-s3" {
+  source = "./modules/aws-s3"
+
+  project_name  = var.project_name
+  bucket_suffix = random_pet.instance.id
+}
