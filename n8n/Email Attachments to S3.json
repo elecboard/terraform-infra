@@ -1,0 +1,178 @@
+{
+  "name": "Email Attachments to S3",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "04cc22cc-d77e-44d1-b110-f2ee49a92cd4",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "AAMkADA4ZGY1MGQ1LWFlMzYtNGNmMy05MzIwLTE3MjIyYjY1MDU5NQBGAAAAAAB83YfVwBYtRJ72dwi_Xjx-BwCxLY7wO36PQoHPQ-Ey4o7NAABIUDIBAACxLY7wO36PQoHPQ-Ey4o7NAABsH0hcAAA=",
+          "mode": "list",
+          "cachedResultName": "Buy2Sell stocklist ",
+          "cachedResultUrl": "https://outlook.office365.com/owa/?ItemID=AAMkADA4ZGY1MGQ1LWFlMzYtNGNmMy05MzIwLTE3MjIyYjY1MDU5NQBGAAAAAAB83YfVwBYtRJ72dwi%2BXjx%2FBwCxLY7wO36PQoHPQ%2FEy4o7NAABIUDIBAACxLY7wO36PQoHPQ%2FEy4o7NAABsH0hcAAA%3D&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        "output": "raw",
+        "options": {}
+      },
+      "id": "af57943d-4a31-40ce-add6-5bff9aea93b7",
+      "name": "Get Emails with Attachments",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        464,
+        304
+      ],
+      "webhookId": "20e948b2-f832-4e2d-9761-fbbb07eac5ab",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "jPyB4cZr0sX8lVnF",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "$binary",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        304
+      ],
+      "id": "897b9212-2168-4afd-9ec1-37bf086300f2",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "resource": "messageAttachment",
+        "operation": "getAll",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "0e0d2eac-9201-435e-a108-1f9d311360b1",
+      "name": "Get All Attachments",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ],
+      "webhookId": "39dd96c0-7524-4f77-a06c-6063b033aa2c",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "jPyB4cZr0sX8lVnF",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messageAttachment",
+        "operation": "download",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $(\"Get Emails with Attachments\").item.json.id }}",
+          "mode": "id"
+        },
+        "attachmentId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        }
+      },
+      "id": "556e3b44-70f9-41de-88d8-7fea36a423bc",
+      "name": "Download Attachment",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        912,
+        304
+      ],
+      "webhookId": "9b0235d8-7f59-4655-9428-261a93dd0b53",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "jPyB4cZr0sX8lVnF",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Emails with Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Emails with Attachments": {
+      "main": [
+        [
+          {
+            "node": "Get All Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Attachments": {
+      "main": [
+        [
+          {
+            "node": "Download Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Attachment": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "45636895-4338-4719-bc2c-714e549c46a8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ffed7bbc36c2da9868d35dbdae69c23d72a341dd64dcdce3a9275e7de5806848"
+  },
+  "id": "z9nFAt7pixYhkZra",
+  "tags": []
+}
