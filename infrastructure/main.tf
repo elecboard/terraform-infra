@@ -61,10 +61,13 @@ module "aws-s3" {
 module "aws-lambda" {
   source = "./modules/aws-lambda"
 
-  project_name = var.project_name
-  db_user      = var.db_master_username
-  db_password  = var.db_master_password
-  db_host      = module.aws-aurora.cluster_endpoint
-  db_name      = var.db_name
-  db_schema    = var.db_schema
+  project_name      = var.project_name
+  db_user           = var.db_master_username
+  db_password       = var.db_master_password
+  db_host           = module.aws-aurora.cluster_endpoint
+  db_name           = var.db_name
+  db_schema         = var.db_schema
+  s3_bucket_id      = module.aws-s3.bucket_id
+  s3_bucket_arn     = module.aws-s3.bucket_arn
+  s3_trigger_prefix = "buy2sell/"
 }
