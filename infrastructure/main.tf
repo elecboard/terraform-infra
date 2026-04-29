@@ -57,3 +57,14 @@ module "aws-s3" {
   project_name  = var.project_name
   bucket_suffix = random_pet.instance.id
 }
+
+module "aws-lambda" {
+  source = "./modules/aws-lambda"
+
+  project_name = var.project_name
+  db_user      = var.db_master_username
+  db_password  = var.db_master_password
+  db_host      = module.aws-aurora.cluster_endpoint
+  db_name      = var.db_name
+  db_schema    = var.db_schema
+}

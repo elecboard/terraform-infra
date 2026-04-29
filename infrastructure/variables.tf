@@ -20,3 +20,22 @@ variable "db_master_password" {
   description = "Master password for Aurora PostgreSQL database."
   sensitive   = true
 }
+
+variable "db_master_username" {
+  type        = string
+  description = "Master username for Aurora PostgreSQL database."
+  sensitive   = true
+  default     = "postgres"
+}
+
+variable "db_name" {
+  type        = string
+  description = "Initial database name."
+  default     = "ebdb"
+}
+
+variable "db_schema" {
+  type        = string
+  description = "Database schema."
+  default     = "public"
+}
