@@ -113,6 +113,28 @@
           "name": "Microsoft Outlook account"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "terraform-eb-immense-shrew",
+        "fileName": "buy2sell/Stocklist.csv",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        304
+      ],
+      "id": "77971c24-246e-4b13-9bee-3b8385b6c8c0",
+      "name": "Upload a file",
+      "credentials": {
+        "aws": {
+          "id": "ZbE3XNIzvW7b3QHl",
+          "name": "AWS (IAM) account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -160,6 +182,17 @@
           }
         ]
       ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Upload a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -168,7 +201,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "45636895-4338-4719-bc2c-714e549c46a8",
+  "versionId": "fb047cb7-c397-449a-9954-d67766c51e64",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "ffed7bbc36c2da9868d35dbdae69c23d72a341dd64dcdce3a9275e7de5806848"
