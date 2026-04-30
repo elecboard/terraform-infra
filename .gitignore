@@ -1,3 +1,7 @@
+# Lambda build artifacts
+infrastructure/modules/aws-lambda/build/
+infrastructure/modules/aws-lambda/lambda_function.zip
+
 # Terraform
 .terraform/
 .terraform.lock.hcl

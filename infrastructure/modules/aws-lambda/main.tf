@@ -1,7 +1,32 @@
+resource "null_resource" "lambda_build" {
+  triggers = {
+    requirements = filemd5("${path.module}/requirements.txt")
+    handler      = filemd5("${path.module}/package/lambda_function.py")
+    filter       = filemd5("${path.module}/package/buy2sell_filter.py")
+    db_conn      = filemd5("${path.module}/package/config/db_connection.py")
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      mkdir -p ${path.module}/build
+      pip install -r ${path.module}/requirements.txt \
+        -t ${path.module}/build \
+        --upgrade --quiet \
+        --platform manylinux2014_x86_64 \
+        --implementation cp \
+        --python-version 312 \
+        --only-binary=:all:
+      cp -r ${path.module}/package/. ${path.module}/build/
+    EOT
+  }
+}
+
 data "archive_file" "lambda" {
   type        = "zip"
-  source_file = "${path.module}/lambda/lambda_function.py"
-  output_path = "${path.module}/lambda/lambda_function.zip"
+  source_dir  = "${path.module}/build"
+  output_path = "${path.module}/lambda_function.zip"
+
+  depends_on = [null_resource.lambda_build]
 }
 
 resource "aws_iam_role" "lambda" {
@@ -26,27 +51,49 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy" "s3_read" {
-  name = "${var.project_name}-lambda-s3-read"
+resource "aws_iam_role_policy" "s3_access" {
+  name = "${var.project_name}-lambda-s3-access"
   role = aws_iam_role.lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "s3:GetObject"
-      Resource = "${var.s3_bucket_arn}/${var.s3_trigger_prefix}*"
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${var.s3_bucket_arn}/${var.s3_trigger_prefix}*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${var.s3_bucket_arn}/lambda/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:PutObject"
+        Resource = "${var.s3_bucket_arn}/buy2sell/logs/*"
+      },
+    ]
   })
 }
 
+resource "aws_s3_object" "lambda_zip" {
+  bucket = var.s3_bucket_id
+  key    = "lambda/aws-lambda-b2s.zip"
+  source = data.archive_file.lambda.output_path
+  etag   = data.archive_file.lambda.output_md5
+}
+
 resource "aws_lambda_function" "this" {
-  filename         = data.archive_file.lambda.output_path
+  s3_bucket        = aws_s3_object.lambda_zip.bucket
+  s3_key           = aws_s3_object.lambda_zip.key
   function_name    = "${var.project_name}-aws-lambda-b2s"
   role             = aws_iam_role.lambda.arn
   handler          = "lambda_function.handler"
   source_code_hash = data.archive_file.lambda.output_base64sha256
   runtime          = "python3.12"
+  timeout          = 900
+  memory_size      = 512
 
   environment {
     variables = {
