@@ -287,8 +287,8 @@ def fetch_brand_id(cursor, brand_name: str) -> int:
     )
     if row:
         return row["id"]
-    cursor.execute("INSERT INTO brands (name) VALUES (%s)", (brand_name,))
-    return cursor.lastrowid
+    cursor.execute("INSERT INTO brands (name) VALUES (%s) RETURNING id", (brand_name,))
+    return cursor.fetchone()["id"]
 
 
 def fetch_category_id(cursor, name: str) -> int:
@@ -300,10 +300,10 @@ def fetch_category_id(cursor, name: str) -> int:
     if row:
         return row["id"]
     cursor.execute(
-        "INSERT INTO categories (name) VALUES (%s)",
+        "INSERT INTO categories (name) VALUES (%s) RETURNING id",
         (name,),
     )
-    return cursor.lastrowid
+    return cursor.fetchone()["id"]
 
 
 def fetch_product_by_reference(cursor, reference: str):
@@ -349,10 +349,10 @@ def insert_product(
 ) -> int:
     cursor.execute(
         "INSERT INTO products (reference, brand_id, category, weight_kg, gtin, sku) "
-        "VALUES (%s, %s, %s, %s, %s, %s)",
+        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
         (reference, brand_id, category_id, weight_kg, gtin, sku),
     )
-    return cursor.lastrowid
+    return cursor.fetchone()["id"]
 
 
 def get_next_filename_for_product(cursor, sku: str) -> str:
@@ -385,15 +385,15 @@ def fetch_or_insert_image(cursor, image_url: str, sku: str) -> tuple[int, bool]:
     alt_text = get_next_filename_for_product(cursor, sku)
 
     cursor.execute(
-        "INSERT INTO images (url, shopify_url, alt_text) VALUES (%s, %s, %s)",
+        "INSERT INTO images (url, shopify_url, alt_text) VALUES (%s, %s, %s) RETURNING id",
         (image_url, image_url, alt_text),
     )
-    return cursor.lastrowid, True
+    return cursor.fetchone()["id"], True
 
 
 def link_price_to_image(cursor, price_id: int, image_id: int) -> bool:
     cursor.execute(
-        "INSERT IGNORE INTO price_images (price_id, image_id) VALUES (%s, %s)",
+        "INSERT INTO price_images (price_id, image_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
         (price_id, image_id),
     )
     return cursor.rowcount > 0
@@ -637,11 +637,11 @@ def process_products(products: list[dict]) -> tuple[int, int, int, int, int, int
                     cursor.execute(
                         """INSERT INTO prices (product_id, supplier_id, condition_id,
                         lead_time_id, warranty, price, currency, quantity)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
                         (product_id, SUPPLIER_ID, condition_id, DEFAULT_LEAD_TIME_ID, DEFAULT_WARRANTY, price, DEFAULT_CURRENCY, quantity)
                     )
                     prices_inserted += 1
-                    price_id = cursor.lastrowid
+                    price_id = cursor.fetchone()["id"]
 
                 processed_price_keys.add((product_id, condition_id))
 

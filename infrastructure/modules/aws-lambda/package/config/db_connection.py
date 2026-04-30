@@ -1,25 +1,23 @@
 import os
-import mysql.connector
+import psycopg2
+import psycopg2.extras
 
 
 DB_CONFIG = {
     'user': os.getenv("DB_USER"),
     'password': os.getenv("DB_PASSWORD"),
     'host': os.getenv("DB_HOST"),
-    'database': os.getenv("DB_NAME"),
+    'dbname': os.getenv("DB_NAME"),
+    'options': '-c search_path=preprod_eb',
 }
 
 
 def get_db_connection():
     try:
-        conn = mysql.connector.connect(
-            **DB_CONFIG,
-            charset='utf8mb4',
-            use_unicode=True,
-        )
+        conn = psycopg2.connect(**DB_CONFIG)
         conn.autocommit = False
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         return conn, cursor
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print("DB Connection Error:", err)
         raise

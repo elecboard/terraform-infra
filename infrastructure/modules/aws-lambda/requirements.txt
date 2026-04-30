@@ -1,4 +1,4 @@
 pandas
-mysql-connector-python
+psycopg2-binary
 tqdm
 python-dotenv
