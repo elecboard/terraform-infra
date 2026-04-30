@@ -123,3 +123,82 @@ Once converted, this PostgreSQL file needs to be uploaded to the Aurora database
 ```bash
 psql -h "$RDSHOST" -U postgres -d ebdb -f db_tools/postgres_EB.sql
 ```
+
+---
+
+### 29/04/2026
+
+### S3 Bucket
+
+An S3 bucket is provisioned via the `modules/aws-s3` module. The bucket name is composed of the project name and a random suffix (e.g. `terraform-eb-immense-shrew`) to ensure global uniqueness. Versioning and AES256 server-side encryption are enabled by default.
+
+Two folders are pre-created inside the bucket:
+
+- `buy2sell/` — incoming stock files from the Buy2Sell supplier
+- `maxodeals/` — reserved for the Maxodeals supplier
+
+---
+
+### n8n
+
+The n8n workflow (`n8n/Email Attachments to S3.json`) automates the process of reading an email, downloading its attachment and uploading it to an S3 bucket. There are various nodes, each executing a different process synchronously:
+
+1. Connects to Microsoft Outlook via OAuth2 and fetches the target email by its message ID (Get Emails with Attachments)
+2. Retrieves the list of all attachments on that email (Get All Attachments)
+3. Downloads the binary content of each attachment (Download Attachment)
+4. Splits the output so each attachment is handled as an individual item (Split Out)
+5. Uploads the file to `buy2sell/Stocklist.csv` in the S3 bucket, which automatically triggers the Lambda function (Upload a file)
+
+The first step is to establish both connections to Outlook and to the AWS - S3 bucket; that is why it is currently configured with a manual trigger. For that, we need authentication from Outlook (allowed by the account manager) and a specific aws-n8n user with (almost all) AdminPermissions.
+
+---
+
+### Lambda — Buy2Sell Stock Processor
+
+A Lambda function (`terraform-eb-aws-lambda-b2s`) is provisioned via the `modules/aws-lambda` module. It is triggered automatically whenever a new file is uploaded to the `buy2sell/` prefix of the S3 bucket and runs the Buy2Sell stock import pipeline (`buy2sell_filter.py`).
+
+The function is configured with a 15-minute timeout and 512 MB of memory to handle large stock files and does the following:
+
+1. Downloads the uploaded file from S3 to `/tmp/Stocklist.csv`
+2. Parses and normalises the CSV (references, brands, prices, quantities, GTINs, images)
+3. Upserts products and prices into the database, aggregating quantities and keeping the highest price per product-condition pair
+4. Zeros out quantities for any supplier prices not present in the new stock file
+5. Uploads a CSV error log to `buy2sell/logs/` in the same S3 bucket if any rows fail validation
+
+Because the dependencies (`pandas`, `mysql-connector-python`, `tqdm`) exceed AWS's 70 MB direct upload limit, the deployment package is built locally and uploaded to S3 first, then referenced by the Lambda resource. Dependencies must be compiled for the Lambda runtime (Amazon Linux / Python 3.12) regardless of the host OS — this is handled automatically by the `null_resource` build step in Terraform, which passes platform flags to `pip`:
+
+```bash
+pip install -r requirements.txt \
+  -t build/ \
+  --platform manylinux2014_x86_64 \
+  --implementation cp \
+  --python-version 312 \
+  --only-binary=:all:
+```
+
+To force a full rebuild of the package (e.g. after adding a dependency), run:
+
+```bash
+terraform apply -replace='module.aws-lambda.null_resource.lambda_build'
+```
+
+** *The `build/` directory and `lambda_function.zip` are generated artifacts and must not be committed — they are covered by `.gitignore`*
+
+---
+
+### tfvars Auto-loading
+
+The variable file has been renamed from `.terraform.tfvars` to `terraform.tfvars` (no leading dot). Terraform automatically loads any file named `terraform.tfvars` in the working directory on every `plan` and `apply`, so the `-var-file` flag used in the **Deploying the Infrastructure** section is no longer needed. The deploy commands simplify to:
+
+```bash
+terraform plan
+terraform apply
+```
+
+The file contents remain the same and must never be committed — it is covered by the `*.tfvars` rule in `.gitignore`:
+
+```hcl
+db_master_password = "your-secure-password"
+```
+
+** *AWS Aurora only accepts hexadecimal passwords*
