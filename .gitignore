@@ -1,6 +1,7 @@
 # Lambda build artifacts
-infrastructure/modules/aws-lambda/build/
-infrastructure/modules/aws-lambda/lambda_function.zip
+infrastructure/modules/aws-lambda-b2s/build/
+infrastructure/modules/aws-lambda-b2s/lambda_function.zip
+infrastructure/modules/aws-lambda-b2s/lambda/
 
 # Terraform
 .terraform/

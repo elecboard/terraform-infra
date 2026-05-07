@@ -155,7 +155,7 @@ The first step is to establish both connections to Outlook and to the AWS - S3 b
 
 ### Lambda — Buy2Sell Stock Processor
 
-A Lambda function (`terraform-eb-aws-lambda-b2s`) is provisioned via the `modules/aws-lambda` module. It is triggered automatically whenever a new file is uploaded to the `buy2sell/` prefix of the S3 bucket and runs the Buy2Sell stock import pipeline (`buy2sell_filter.py`).
+A Lambda function (`terraform-eb-aws-lambda-b2s`) is provisioned via the `modules/aws-lambda-b2s` module. It is triggered automatically whenever a new file is uploaded to the `buy2sell/` prefix of the S3 bucket and runs the Buy2Sell stock import pipeline (`buy2sell_filter.py`).
 
 The function is configured with a 15-minute timeout and 512 MB of memory to handle large stock files and does the following:
 
@@ -179,7 +179,7 @@ pip install -r requirements.txt \
 To force a full rebuild of the package (e.g. after adding a dependency), run:
 
 ```bash
-terraform apply -replace='module.aws-lambda.null_resource.lambda_build'
+terraform apply -replace='module.aws-lambda-b2s.null_resource.lambda_build'
 ```
 
 ** *The `build/` directory and `lambda_function.zip` are generated artifacts and must not be committed — they are covered by `.gitignore`*
@@ -202,3 +202,65 @@ db_master_password = "your-secure-password"
 ```
 
 ** *AWS Aurora only accepts hexadecimal passwords*
+
+---
+
+### 30/04/2026
+
+### PostgreSQL Migration — Lambda Scripts
+
+The Lambda scripts were migrated from MariaDB (`mysql-connector-python`) to PostgreSQL (`psycopg2`) to match the Aurora PostgreSQL database provisioned earlier.
+
+**`config/db_connection.py`** was rewritten to use `psycopg2`:
+
+- Driver replaced: `mysql.connector` → `psycopg2`
+- Connection key renamed: `database` → `dbname` (psycopg2 uses a different parameter name)
+- Schema set on every connection via `options`: `'-c search_path=preprod_eb'` — this ensures all table references resolve to the correct schema without needing to qualify them explicitly
+- Dictionary cursor replaced: `cursor(dictionary=True)` → `cursor(cursor_factory=psycopg2.extras.RealDictCursor)`
+- MySQL-only connection options removed: `charset='utf8mb4'`, `use_unicode=True`
+- Exception class updated: `mysql.connector.Error` → `psycopg2.Error`
+
+**`requirements.txt`** was updated:
+
+```
+mysql-connector-python  →  psycopg2-binary
+```
+
+`psycopg2-binary` bundles the native shared libraries, so no system-level PostgreSQL installation is required in the Lambda runtime.
+
+**`buy2sell_filter.py`** had six SQL compatibility fixes applied:
+
+1. `cursor.lastrowid` is not supported by psycopg2. All five `INSERT` statements that read the generated ID were updated to use `RETURNING id` and `cursor.fetchone()["id"]` instead. Affected tables: `brands`, `categories`, `products`, `images`, `prices`.
+
+2. `INSERT IGNORE INTO price_images` is MariaDB-specific syntax. Replaced with:
+
+```sql
+INSERT INTO price_images (price_id, image_id) VALUES (%s, %s) ON CONFLICT DO NOTHING
+```
+
+This requires a unique constraint on `(price_id, image_id)` to be present on the table, which it is.
+
+The same fixes were applied to the Lambda deployment copies in `modules/aws-lambda-b2s/build/` and `modules/aws-lambda-b2s/package/`.
+
+---
+
+### CSV Encoding Fallback
+
+The `fetch_products` function in `buy2sell_filter.py` was made robust to non-UTF-8 supplier files. Pandas previously used the default `utf-8` encoding and would raise an unhandled `UnicodeDecodeError` if the supplier sent a file encoded in Latin-1 or Windows-1252 (common for European suppliers).
+
+The function now tries encodings in order:
+
+1. `utf-8-sig` — handles both plain UTF-8 and UTF-8 with BOM
+2. `latin-1` — accepts every possible byte value; used as a safe fallback for any Western European encoding
+
+If the fallback encoding is used, a note is printed to the logs so it is visible in CloudWatch.
+
+---
+
+### 05/05/2026
+
+### Dreamland Supplier — New Lambda Script
+
+A second supplier script, `infrastructure/lambda-scripts/dreamland/dreamland_filter.py`, was started following the same structure as `buy2sell_filter.py` (same bootstrap pattern, same `config` package imports for DB connection and environment loading).
+
+**`infrastructure/modules/aws-s3/main.tf`** was updated to add the `dreamland/` prefix folder in the stock S3 bucket, alongside the existing `buy2sell/` and `maxodeals/` prefixes.
