@@ -637,11 +637,11 @@ def process_products(products: list[dict]) -> tuple[int, int, int, int, int, int
                     cursor.execute(
                         """INSERT INTO prices (product_id, supplier_id, condition_id,
                         lead_time_id, warranty, price, currency, quantity)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                         (product_id, SUPPLIER_ID, condition_id, DEFAULT_LEAD_TIME_ID, DEFAULT_WARRANTY, price, DEFAULT_CURRENCY, quantity)
                     )
                     prices_inserted += 1
-                    price_id = cursor.fetchone()["id"]
+                    price_id = cursor.lastrowid
 
                 processed_price_keys.add((product_id, condition_id))
 

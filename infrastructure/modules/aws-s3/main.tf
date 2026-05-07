@@ -42,3 +42,8 @@ resource "aws_s3_object" "maxodeals" {
   bucket = aws_s3_bucket.this.id
   key    = "maxodeals/"
 }
+
+resource "aws_s3_object" "dreamland" {
+  bucket = aws_s3_bucket.this.id
+  key    = "dreamland/"
+}

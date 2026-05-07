@@ -410,8 +410,16 @@ def link_price_to_image(cursor, price_id: int, image_id: int) -> bool:
 # FETCH DATA FROM CSV
 def fetch_products(path: str) -> list[dict]:
     try:
-        df = pd.read_csv(path, quotechar='"')
-        return df.to_dict(orient="records")
+        for encoding in ("utf-8-sig", "latin-1"):
+            try:
+                df = pd.read_csv(path, quotechar='"', encoding=encoding)
+                if encoding != "utf-8-sig":
+                    print(f"Note: CSV read with fallback encoding '{encoding}'")
+                return df.to_dict(orient="records")
+            except UnicodeDecodeError:
+                continue
+        print("Error: CSV file could not be decoded with any supported encoding")
+        return []
     except FileNotFoundError:
         print(f"Error: CSV file not found at {path}")
         return []
