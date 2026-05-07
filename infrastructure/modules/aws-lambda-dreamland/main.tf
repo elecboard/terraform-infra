@@ -2,7 +2,7 @@ resource "null_resource" "lambda_build" {
   triggers = {
     requirements = filemd5("${path.module}/requirements.txt")
     handler      = filemd5("${path.module}/package/lambda_function.py")
-    filter       = filemd5("${path.module}/package/buy2sell_filter.py")
+    filter       = filemd5("${path.module}/package/dreamland_filter.py")
     db_conn      = filemd5("${path.module}/package/config/db_connection.py")
   }
 
@@ -30,7 +30,7 @@ data "archive_file" "lambda" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name = "${var.project_name}-lambda-role"
+  name = "${var.project_name}-dreamland-lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -52,26 +52,27 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 }
 
 resource "aws_iam_role_policy" "s3_access" {
-  name = "${var.project_name}-lambda-s3-access"
+  name = "${var.project_name}-dreamland-lambda-s3-access"
   role = aws_iam_role.lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = "s3:GetObject"
-        Resource = "${var.s3_bucket_arn}/${var.s3_trigger_prefix}*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = "s3:GetObject"
-        Resource = "${var.s3_bucket_arn}/lambda/*"
+        Effect = "Allow"
+        Action = "s3:GetObject"
+        Resource = [
+          "${var.s3_bucket_arn}/${var.s3_trigger_prefix}*",
+          "${var.s3_bucket_arn}/lambda/*",
+        ]
       },
       {
         Effect   = "Allow"
         Action   = "s3:PutObject"
-        Resource = "${var.s3_bucket_arn}/buy2sell/logs/*"
+        Resource = [
+          "${var.s3_bucket_arn}/dreamland/logs/*",
+          "${var.s3_bucket_arn}/images/*",
+        ]
       },
     ]
   })
@@ -79,7 +80,7 @@ resource "aws_iam_role_policy" "s3_access" {
 
 resource "aws_s3_object" "lambda_zip" {
   bucket = var.s3_bucket_id
-  key    = "lambda/aws-lambda-b2s.zip"
+  key    = "lambda/aws-lambda-dreamland.zip"
   source = data.archive_file.lambda.output_path
   etag   = data.archive_file.lambda.output_md5
 }
@@ -87,7 +88,7 @@ resource "aws_s3_object" "lambda_zip" {
 resource "aws_lambda_function" "this" {
   s3_bucket        = aws_s3_object.lambda_zip.bucket
   s3_key           = aws_s3_object.lambda_zip.key
-  function_name    = "${var.project_name}-aws-lambda-b2s"
+  function_name    = "${var.project_name}-aws-lambda-dreamland"
   role             = aws_iam_role.lambda.arn
   handler          = "lambda_function.handler"
   source_code_hash = data.archive_file.lambda.output_base64sha256
@@ -97,11 +98,14 @@ resource "aws_lambda_function" "this" {
 
   environment {
     variables = {
-      DB_USER     = var.db_user
-      DB_PASSWORD = var.db_password
-      DB_HOST     = var.db_host
-      DB_NAME     = var.db_name
-      DB_SCHEMA   = var.db_schema
+      DB_USER          = var.db_user
+      DB_PASSWORD      = var.db_password
+      DB_HOST          = var.db_host
+      DB_NAME          = var.db_name
+      DB_SCHEMA        = var.db_schema
+      IMAGES_URL       = var.images_url
+      BASE_URL         = var.base_url
+      IMAGES_S3_BUCKET = var.s3_bucket_id
     }
   }
 

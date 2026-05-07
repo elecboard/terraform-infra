@@ -2,6 +2,8 @@
 infrastructure/modules/aws-lambda-b2s/build/
 infrastructure/modules/aws-lambda-b2s/lambda_function.zip
 infrastructure/modules/aws-lambda-b2s/lambda/
+infrastructure/modules/aws-lambda-dreamland/build/
+infrastructure/modules/aws-lambda-dreamland/lambda_function.zip
 
 # Terraform
 .terraform/

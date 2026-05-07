@@ -39,3 +39,15 @@ variable "db_schema" {
   description = "Database schema."
   default     = "public"
 }
+
+variable "dreamland_images_url" {
+  type        = string
+  description = "URL of the Dreamland image feed (leave empty to skip image sync)."
+  default     = ""
+}
+
+variable "dreamland_base_url" {
+  type        = string
+  description = "Base URL for downloading individual Dreamland images."
+  default     = ""
+}
