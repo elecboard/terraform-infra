@@ -1,0 +1,95 @@
+{
+  "name": "Dreamland",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ef919084-aedc-4bf0-b0e8-2a95bc6a3ac0",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://dreamland-plc.com/downloads/AFC1AE86-E55B-415E-8391-0C80B7DE160F.json",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "20ecf548-6b8c-4481-9d02-69c6e88606da",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "terraform-eb-immense-shrew",
+        "fileName": "dreamland/stocklist.json",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "2ee560c6-2471-4199-a6b0-8358f1679c85",
+      "name": "Upload a file",
+      "credentials": {
+        "aws": {
+          "id": "ZbE3XNIzvW7b3QHl",
+          "name": "AWS (IAM) account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Upload a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bf6646d2-881e-4b73-aa0f-e627653af080",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ffed7bbc36c2da9868d35dbdae69c23d72a341dd64dcdce3a9275e7de5806848"
+  },
+  "id": "P5hr4naI3ZW3zEmI",
+  "tags": []
+}
