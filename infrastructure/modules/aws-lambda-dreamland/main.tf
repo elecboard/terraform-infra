@@ -85,6 +85,13 @@ resource "aws_s3_object" "lambda_zip" {
   etag   = data.archive_file.lambda.output_md5
 }
 
+# Lambda auto-creates this group on first run with no expiry; declaring it
+# lets us cap retention so logs don't accumulate cost indefinitely.
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = "/aws/lambda/${var.project_name}-aws-lambda-dreamland"
+  retention_in_days = 30
+}
+
 resource "aws_lambda_function" "this" {
   s3_bucket        = aws_s3_object.lambda_zip.bucket
   s3_key           = aws_s3_object.lambda_zip.key
@@ -95,6 +102,8 @@ resource "aws_lambda_function" "this" {
   runtime          = "python3.12"
   timeout          = 900
   memory_size      = 1024
+
+  depends_on = [aws_cloudwatch_log_group.lambda]
 
   environment {
     variables = {
