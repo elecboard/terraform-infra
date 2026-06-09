@@ -264,3 +264,102 @@ If the fallback encoding is used, a note is printed to the logs so it is visible
 A second supplier script, `infrastructure/lambda-scripts/dreamland/dreamland_filter.py`, was started following the same structure as `buy2sell_filter.py` (same bootstrap pattern, same `config` package imports for DB connection and environment loading).
 
 **`infrastructure/modules/aws-s3/main.tf`** was updated to add the `dreamland/` prefix folder in the stock S3 bucket, alongside the existing `buy2sell/` and `maxodeals/` prefixes.
+
+---
+
+### 07/05/2026
+
+### Module Rename — `aws-lambda` → `aws-lambda-b2s`
+
+The Lambda module was renamed from `modules/aws-lambda` to `modules/aws-lambda-b2s` to make it supplier-specific and consistent with the naming of the new Dreamland module. The following were updated:
+
+- Directory renamed: `infrastructure/modules/aws-lambda/` → `infrastructure/modules/aws-lambda-b2s/`
+- Module block and source path updated in `infrastructure/main.tf`
+- References updated in `infrastructure/INSTRUCTIONS.md`
+- `.gitignore` paths updated
+
+Because Terraform tracks resources under the old module address (`module.aws-lambda.*`), a state rename was required after `terraform init`:
+
+```bash
+terraform state mv module.aws-lambda.<resource> module.aws-lambda-b2s.<resource>
+```
+
+---
+
+### Lambda — Dreamland Stock + Image Processor
+
+A Lambda function (`terraform-eb-aws-lambda-dreamland`) is provisioned via the `modules/aws-lambda-dreamland` module. It is triggered automatically whenever a new file is uploaded to the `dreamland/` prefix of the S3 bucket and runs the Dreamland stock import and image sync pipeline (`dreamland_filter.py`).
+
+The function is configured with a 15-minute timeout and 1024 MB of memory and operates in two phases:
+
+**Phase 1 — Stock sync**: downloads the uploaded JSON file from S3, parses and normalises products (references, brands, categories, conditions, prices, quantities, lead times), upserts into the database, and zeros out quantities for any supplier prices absent from the new feed.
+
+**Phase 2 — Image sync**: streams the supplier image feed, matches images to prices with missing image relationships, downloads non-generic images, uploads them to S3 under `images/`, and writes the relationships to the database. This phase is skipped if `IMAGES_URL` or `BASE_URL` are not set.
+
+The module package contains:
+
+- `dreamland_filter.py` — main pipeline (copy of `lambda-scripts/dreamland/dreamland_filter.py`)
+- `lambda_function.py` — thin wrapper that exposes `handler` to the Lambda runtime
+- `brand_map.json` — optional JSON object mapping raw brand strings to canonical names (`{"raw": "Canonical"}`)
+- `config/` — shared `db_connection.py` and `env_utils.py`
+
+**Brand map** is loaded from `brand_map.json` (same directory as `dreamland_filter.py`). If the file is absent or invalid JSON, the map is silently treated as empty. To add or update mappings, edit `modules/aws-lambda-dreamland/package/brand_map.json` and redeploy.
+
+Two optional infrastructure variables control image sync (set in `terraform.tfvars`):
+
+```hcl
+dreamland_images_url = "https://..."   # URL of the supplier image feed
+dreamland_base_url   = "https://..."   # Base URL for individual image downloads
+```
+
+To force a full rebuild of the package:
+
+```bash
+terraform apply -replace='module.aws-lambda-dreamland.null_resource.lambda_build'
+```
+
+---
+
+### Combined S3 Bucket Notification
+
+Because AWS only allows a single `aws_s3_bucket_notification` resource per bucket, the trigger configuration for both Lambda functions was moved out of the individual modules and consolidated into a single resource in `infrastructure/main.tf`:
+
+```hcl
+resource "aws_s3_bucket_notification" "lambda_triggers" {
+  bucket = module.aws-s3.bucket_id
+
+  lambda_function {
+    lambda_function_arn = module.aws-lambda-b2s.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "buy2sell/"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.aws-lambda-dreamland.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "dreamland/"
+  }
+}
+```
+
+Adding a third supplier Lambda in the future requires adding another `lambda_function` block here alongside its corresponding module.
+
+---
+
+### 09/06/2026
+
+### ECR Repository for the int-shopify Service
+
+A new module `modules/aws-ecr` creates a single ECR repository (`terraform-eb-int-shopify`) that hosts the NestJS image for the `int-shopify` project. ECR is a regional container registry — it does not live inside a VPC. The containers that run the image (NestJS + Redis) are deployed as an ECS service **from the `int-shopify` repo**, and that service is what must sit in the default VPC to reach Aurora. Aurora is already publicly reachable in the default VPC, so no networking changes were made here.
+
+Because a new resource type (`aws_ecr_repository`) is added, run `terraform init` again before applying. After `apply`, the repository URL is exposed as the `ecr_repository_url` output and is the push/pull target for the image.
+
+```bash
+terraform init
+terraform apply -var-file=.terraform.tfvars
+terraform output ecr_repository_url
+```
+
+Repository settings: tags are mutable (CI can overwrite `latest`), images are scanned on push, untagged images expire after 7 days, and `force_delete` is enabled so `terraform destroy` removes the repo even when it still holds images.
+
+The build-and-push steps run from the `int-shopify` repo and are documented in that repo's `README.md`.
