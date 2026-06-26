@@ -25,12 +25,6 @@ module "aws-s3" {
   bucket_suffix = random_pet.instance.id
 }
 
-module "aws-ecr" {
-  source = "./modules/aws-ecr"
-
-  project_name = var.project_name
-}
-
 module "aws-lambda-b2s" {
   source = "./modules/aws-lambda-b2s"
 

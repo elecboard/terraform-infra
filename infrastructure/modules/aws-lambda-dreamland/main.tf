@@ -101,7 +101,7 @@ resource "aws_lambda_function" "this" {
   source_code_hash = data.archive_file.lambda.output_base64sha256
   runtime          = "python3.12"
   timeout          = 900
-  memory_size      = 1024
+  memory_size      = 2048
 
   depends_on = [aws_cloudwatch_log_group.lambda]
 
