@@ -1,0 +1,33 @@
+# Production stack for the single Docker host. Deployed to
+# /opt/<service>/docker-compose.yml on the box by user_data.
+#
+# nestjs  -> pulled from ECR (image tag + all config come from .env)
+# redis   -> BullMQ's queue (disposable, kept on a named volume)
+# Postgres is NOT here — the app connects to the managed Aurora cluster
+# over the network via the DB_* values in .env.
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nestjs:
+    image: ${IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Bound to localhost only — no public exposure. Reach Bull Board / health
+    # via an SSM port-forward session, matching the egress-only posture.
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  redis_data:

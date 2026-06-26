@@ -25,6 +25,16 @@ module "aws-s3" {
   bucket_suffix = random_pet.instance.id
 }
 
+# Docker host for the int-shopify service (nestjs + redis containers).
+# Pulls its image from ECR and connects to the Aurora cluster above.
+module "aws-ec2-int-shopify" {
+  source = "./modules/aws-ec2"
+
+  project_name = var.project_name
+  region       = var.region
+  service_name = "int-shopify"
+}
+
 module "aws-lambda-b2s" {
   source = "./modules/aws-lambda-b2s"
 

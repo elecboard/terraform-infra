@@ -1,0 +1,53 @@
+#!/bin/bash
+# Bootstraps the Docker host: installs Docker + Compose, lays down the compose
+# file and a deploy script. Rendered by Terraform (templatefile): region,
+# dotenv_param, app_dir and compose_yaml are substituted at apply time; the
+# shell variables inside the quoted heredocs are written through literally.
+set -euxo pipefail
+
+# --- Docker engine ---
+dnf update -y
+dnf install -y docker
+systemctl enable --now docker
+
+# --- Docker Compose v2 plugin ---
+DOCKER_CLI_PLUGINS=/usr/local/lib/docker/cli-plugins
+mkdir -p "$DOCKER_CLI_PLUGINS"
+curl -SL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64" \
+  -o "$DOCKER_CLI_PLUGINS/docker-compose"
+chmod +x "$DOCKER_CLI_PLUGINS/docker-compose"
+
+# --- App directory + compose file (app config arrives via .env at deploy time) ---
+APP_DIR="${app_dir}"
+mkdir -p "$APP_DIR"
+
+cat > "$APP_DIR/docker-compose.yml" <<'COMPOSE'
+${compose_yaml}
+COMPOSE
+
+# --- Deploy script: invoked by GitHub Actions via SSM Run Command per release.
+# Terraform fills REGION/PARAM/the cd path; $-vars are resolved on the box. ---
+cat > "$APP_DIR/deploy.sh" <<'DEPLOY'
+#!/bin/bash
+set -euo pipefail
+cd "${app_dir}"
+
+REGION="${region}"
+PARAM="${dotenv_param}"
+
+# Pull the freshly-published .env (SecureString) written by CI. GitHub is the
+# source of truth; this parameter is just encrypted transport.
+aws ssm get-parameter --name "$PARAM" --with-decryption --region "$REGION" \
+  --query 'Parameter.Value' --output text > .env
+chmod 600 .env
+
+# Authenticate to ECR with the host's instance role, then roll the stack.
+REGISTRY="$(grep '^IMAGE=' .env | cut -d= -f2- | cut -d/ -f1)"
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$REGISTRY"
+
+docker compose pull
+docker compose up -d
+docker image prune -f
+DEPLOY
+chmod +x "$APP_DIR/deploy.sh"
